@@ -61,6 +61,8 @@ const startServer = (port: number) => {
   });
 };
 
-startServer(Number(port));
+if (require.main === module) {
+  startServer(Number(port));
+}
 
 export { app, prisma };
