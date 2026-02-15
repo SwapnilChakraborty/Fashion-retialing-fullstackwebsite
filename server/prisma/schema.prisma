@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  VENDOR
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(USER)
+  avatar    String?
+  addresses Address[]
+  reviews   Review[]
+  orders    Order[]
+  wishlist  Product[] @relation("Wishlist")
+  
+  vendor    Vendor?   // Only if role is VENDOR (or user can become vendor)
+  
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Vendor {
+  id             String       @id @default(uuid())
+  businessName   String       @unique
+  slug           String       @unique
+  description    String?
+  logo           String?
+  banner         String?
+  status         VendorStatus @default(PENDING)
+  user           User         @relation(fields: [userId], references: [id])
+  userId         String       @unique
+  
+  commissionRate Float        @default(10.0) // Platform commission percentage
+  balance        Float        @default(0.0)  // Current earnigs
+  
+  products       Product[]
+  subOrders      SubOrder[]
+  payouts        Payout[]
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Address {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  street    String
+  city      String
+  state     String
+  country   String
+  zipCode   String
+  isDefault Boolean  @default(false)
+}
+
+model Category {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  slug     String    @unique
+  image    String?
+  products Product[]
+  parentId String?
+  parent   Category? @relation("SubCategories", fields: [parentId], references: [id])
+  children Category[] @relation("SubCategories")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String
+  price       Float
+  stock       Int      @default(0)
+  images      String[]
+  isActive    Boolean  @default(true)
+  
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  vendorId    String
+  
+  category    Category @relation(fields: [categoryId], references: [id])
+  categoryId  String
+  
+  reviews     Review[]
+  orderItems  OrderItem[]
+  wishlistedBy User[]  @relation("Wishlist")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int      // 1-5
+  comment   String?
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  user          User        @relation(fields: [userId], references: [id])
+  userId        String
+  totalAmount   Float
+  paymentStatus String      @default("PENDING") // PAID, FAILED, REFUNDED
+  paymentId     String?     // Stripe Payment Intent ID
+  
+  // An order can contain items from multiple vendors, split into sub-orders
+  subOrders     SubOrder[]
+  
+  shippingAddress Json
+  billingAddress  Json?
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model SubOrder {
+  id              String      @id @default(uuid())
+  order           Order       @relation(fields: [orderId], references: [id])
+  orderId         String
+  vendor          Vendor      @relation(fields: [vendorId], references: [id])
+  vendorId        String
+  
+  items           OrderItem[]
+  status          OrderStatus @default(PENDING)
+  
+  subTotal        Float       // Total for this vendor's items
+  commission      Float       // Amount taken by platform
+  vendorEarnings  Float       // Amount to vendor (subTotal - commission)
+  
+  shippingTrackingId String?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  subOrder   SubOrder @relation(fields: [subOrderId], references: [id])
+  subOrderId String
+  product    Product  @relation(fields: [productId], references: [id])
+  productId  String
+  
+  quantity   Int
+  price      Float    // Price at time of purchase
+}
+
+model Payout {
+  id        String   @id @default(uuid())
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  vendorId  String
+  amount    Float
+  status    String   // REQUESTED, PROCESSED, FAILED
+  createdAt DateTime @default(now())
+}
