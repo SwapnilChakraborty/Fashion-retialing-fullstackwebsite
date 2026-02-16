@@ -11,6 +11,8 @@ export const CreateProductSchema = z.object({
 
     // Optional for drafts
     isActive: z.boolean().default(true),
+
+    slug: z.string().optional(),
 });
 
 export const UpdateProductSchema = CreateProductSchema.partial();
