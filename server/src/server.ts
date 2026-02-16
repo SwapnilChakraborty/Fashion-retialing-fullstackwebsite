@@ -65,4 +65,6 @@ if (require.main === module) {
   startServer(Number(port));
 }
 
-export { app, prisma };
+
+export default app;
+export { prisma };
