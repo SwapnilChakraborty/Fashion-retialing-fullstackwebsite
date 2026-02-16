@@ -41,6 +41,9 @@ export class AuthController {
             const result = await this.service.login(data);
             res.json(result);
         } catch (err: any) {
+            if (err instanceof z.ZodError) {
+                return res.status(400).json({ errors: err.errors });
+            }
             res.status(401).json({ error: err.message });
         }
     }
